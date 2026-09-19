@@ -122,4 +122,12 @@ export class VideosController {
   ) {
     return this.videosService.updateVideo(user.userId, videoId, dto);
   }
+
+  @Get('public/:videoId')
+  getPublicVideo(
+    @Param('videoId')
+    videoId: string,
+  ) {
+    return this.videosService.getPublicVideo(videoId);
+  }
 }

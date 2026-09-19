@@ -294,4 +294,43 @@ export class VideosService {
 
     return updatedVideo;
   }
+
+  async getPublicVideo(videoId: string) {
+    const [video] = await this.databaseService.db
+      .select({
+        id: videos.id,
+        title: videos.title,
+        status: videos.status,
+        visibility: videos.visibility,
+        durationSeconds: videos.durationSeconds,
+        createdAt: videos.createdAt,
+        processedStorageKey: videos.processedStorageKey,
+      })
+      .from(videos)
+      .where(
+        and(
+          eq(videos.id, videoId),
+          eq(videos.visibility, 'PUBLIC'),
+          eq(videos.status, 'READY'),
+        ),
+      )
+      .limit(1);
+
+    if (!video || !video.processedStorageKey) {
+      throw new NotFoundException('Video not found');
+    }
+
+    const playbackUrl = await this.storageService.createDownloadUrl(
+      video.processedStorageKey,
+    );
+
+    return {
+      id: video.id,
+      title: video.title,
+      durationSeconds: video.durationSeconds,
+      createdAt: video.createdAt,
+      playbackUrl,
+      playbackUrlExpiresIn: 900,
+    };
+  }
 }
