@@ -50,6 +50,7 @@ export class VideosController {
       user.userId,
       videoId,
       dto.contentType,
+      dto.sizeBytes,
     );
   }
 

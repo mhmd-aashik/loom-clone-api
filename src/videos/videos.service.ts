@@ -42,8 +42,14 @@ export class VideosService {
     userId: string,
     videoId: string,
     contentType: 'video/webm' | 'video/mp4',
+    sizeBytes: number,
   ) {
-    // Find the video.
+    const MAX_VIDEO_SIZE = 500 * 1024 * 1024;
+
+    if (sizeBytes > MAX_VIDEO_SIZE) {
+      throw new BadRequestException('Video exceeds the 500 MB upload limit');
+    }
+
     const [video] = await this.databaseService.db
       .select()
       .from(videos)
@@ -54,7 +60,6 @@ export class VideosService {
       throw new NotFoundException('Video not found');
     }
 
-    // Ownership check.
     if (video.ownerId !== userId) {
       throw new ForbiddenException('You do not have access to this video');
     }
@@ -68,7 +73,6 @@ export class VideosService {
       contentType,
     );
 
-    // Save where this video's original file lives.
     await this.databaseService.db
       .update(videos)
       .set({
@@ -95,6 +99,7 @@ export class VideosService {
       throw new NotFoundException('Video not found');
     }
 
+    // Ownership check
     if (video.ownerId !== userId) {
       throw new ForbiddenException('You do not have access to this video');
     }
@@ -103,8 +108,10 @@ export class VideosService {
       throw new BadRequestException('Video upload has not been initialized');
     }
 
-    // Ask Railway Storage whether the object
-    // actually exists.
+    // ----------------------------------------
+    // 1. Verify file exists in Railway Storage
+    // ----------------------------------------
+
     let metadata: {
       sizeBytes?: number;
       contentType?: string;
@@ -116,25 +123,64 @@ export class VideosService {
       throw new BadRequestException('Uploaded video was not found in storage');
     }
 
+    // ----------------------------------------
+    // 2. Validate actual uploaded file size
+    // ----------------------------------------
+
+    const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500 MB
+
+    if (!metadata.sizeBytes || metadata.sizeBytes > MAX_VIDEO_SIZE) {
+      // Remove invalid upload from storage.
+      await this.storageService.deleteObject(video.storageKey);
+
+      throw new BadRequestException('Uploaded video exceeds the 500 MB limit');
+    }
+
+    // ----------------------------------------
+    // 3. Validate actual MIME type
+    // ----------------------------------------
+
+    const allowedTypes = ['video/webm', 'video/mp4'];
+
+    if (!metadata.contentType || !allowedTypes.includes(metadata.contentType)) {
+      await this.storageService.deleteObject(video.storageKey);
+
+      throw new BadRequestException('Unsupported video type');
+    }
+
+    // ----------------------------------------
+    // 4. Mark video as PROCESSING
+    // ----------------------------------------
+
     const [updatedVideo] = await this.databaseService.db
       .update(videos)
       .set({
         status: 'PROCESSING',
 
-        sizeBytes: metadata.sizeBytes ?? null,
+        sizeBytes: metadata.sizeBytes,
 
-        mimeType: metadata.contentType ?? video.mimeType,
+        mimeType: metadata.contentType,
 
         updatedAt: new Date(),
       })
       .where(eq(videos.id, videoId))
       .returning();
 
+    // ----------------------------------------
+    // 5. Send processing job to BullMQ
+    // ----------------------------------------
+
+    if (!updatedVideo.storageKey) {
+      throw new BadRequestException('Video storage key is missing');
+    }
+
     await this.videoQueue.add(
       'process-video',
       {
         videoId: updatedVideo.id,
+
         userId: updatedVideo.ownerId,
+
         storageKey: updatedVideo.storageKey,
       },
       {
