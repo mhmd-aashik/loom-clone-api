@@ -22,6 +22,13 @@
       "when": 1789828828177,
       "tag": "0002_pretty_miek",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789836457307,
+      "tag": "0003_natural_synch",
+      "breakpoints": true
     }
   ]
 }

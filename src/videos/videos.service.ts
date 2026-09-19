@@ -5,13 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import { videos } from '../database/schemas';
+import { videos, videoShares } from '../database/schemas';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { StorageService } from '../storage/storage.service';
 import { eq, desc, and } from 'drizzle-orm';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
 import { UpdateVideoDto } from './dto/update-video.dto';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class VideosService {
@@ -331,6 +332,44 @@ export class VideosService {
       createdAt: video.createdAt,
       playbackUrl,
       playbackUrlExpiresIn: 900,
+    };
+  }
+
+  async createShareLink(userId: string, videoId: string) {
+    // Make sure this video belongs to the logged-in user.
+    const [video] = await this.databaseService.db
+      .select({
+        id: videos.id,
+        status: videos.status,
+      })
+      .from(videos)
+      .where(and(eq(videos.id, videoId), eq(videos.ownerId, userId)))
+      .limit(1);
+
+    if (!video) {
+      throw new NotFoundException('Video not found');
+    }
+
+    if (video.status !== 'READY') {
+      throw new BadRequestException('Video is not ready to share');
+    }
+
+    // Example:
+    // 8f2b7d5c...
+    const token = randomBytes(24).toString('hex');
+
+    const [share] = await this.databaseService.db
+      .insert(videoShares)
+      .values({
+        videoId,
+        ownerId: userId,
+        token,
+      })
+      .returning();
+
+    return {
+      token: share.token,
+      sharePath: `/share/${share.token}`,
     };
   }
 }

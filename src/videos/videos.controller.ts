@@ -130,4 +130,16 @@ export class VideosController {
   ) {
     return this.videosService.getPublicVideo(videoId);
   }
+
+  @Post(':videoId/share')
+  @UseGuards(JwtAuthGuard)
+  createShareLink(
+    @CurrentUser()
+    user: AuthenticatedUser,
+
+    @Param('videoId')
+    videoId: string,
+  ) {
+    return this.videosService.createShareLink(user.userId, videoId);
+  }
 }
