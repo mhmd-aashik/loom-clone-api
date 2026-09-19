@@ -9,17 +9,17 @@ import { videos } from '../database/schemas';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { StorageService } from '../storage/storage.service';
 import { eq } from 'drizzle-orm';
-import {
-  HeadObjectCommand,
-  PutObjectCommand,
-  S3Client,
-} from '@aws-sdk/client-s3';
+import { Queue } from 'bullmq';
+import { InjectQueue } from '@nestjs/bullmq';
 
 @Injectable()
 export class VideosService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly storageService: StorageService,
+
+    @InjectQueue('video-processing')
+    private readonly videoQueue: Queue,
   ) {}
 
   async create(userId: string, dto: CreateVideoDto) {
@@ -127,6 +127,27 @@ export class VideosService {
       })
       .where(eq(videos.id, videoId))
       .returning();
+
+    await this.videoQueue.add(
+      'process-video',
+      {
+        videoId: updatedVideo.id,
+        userId: updatedVideo.ownerId,
+        storageKey: updatedVideo.storageKey,
+      },
+      {
+        attempts: 3,
+
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+
+        removeOnComplete: true,
+
+        removeOnFail: 100,
+      },
+    );
 
     return updatedVideo;
   }

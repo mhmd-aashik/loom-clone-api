@@ -5,9 +5,10 @@ import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { VideosModule } from './videos/videos.module';
 import { StorageModule } from './storage/storage.module';
+import { QueueModule } from './queue/queue.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, VideosModule, StorageModule],
+  imports: [DatabaseModule, AuthModule, VideosModule, StorageModule, QueueModule],
   controllers: [AppController],
   providers: [AppService],
 })
