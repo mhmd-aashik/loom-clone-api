@@ -14,6 +14,7 @@ import { StorageService } from '../../storage/storage.service';
 import { DatabaseService } from '../../database/database.service';
 import { eq } from 'drizzle-orm';
 import { videos } from '../../database/schemas';
+import { RealtimeGateway } from '../../realtime/realtime.gateway';
 
 const execFileAsync = promisify(execFile);
 
@@ -28,6 +29,7 @@ export class VideoProcessor extends WorkerHost {
   constructor(
     private readonly storageService: StorageService,
     private readonly databaseService: DatabaseService,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {
     super();
   }
@@ -217,6 +219,8 @@ export class VideoProcessor extends WorkerHost {
         })
         .where(eq(videos.id, videoId));
 
+      this.realtimeGateway.videoReady(userId, videoId);
+
       console.log(`Video READY: ${videoId}`);
     } finally {
       // ----------------------------------------
@@ -258,6 +262,8 @@ export class VideoProcessor extends WorkerHost {
           updatedAt: new Date(),
         })
         .where(eq(videos.id, job.data.videoId));
+
+      this.realtimeGateway.videoFailed(job.data.userId, job.data.videoId);
 
       console.error(`Video permanently failed: ${job.data.videoId}`);
     }
