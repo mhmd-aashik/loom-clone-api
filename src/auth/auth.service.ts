@@ -247,4 +247,55 @@ export class AuthService {
   private compareRefreshToken(token: string, tokenHash: string) {
     return bcrypt.compare(this.digestRefreshToken(token), tokenHash);
   }
+
+  async logout(token: string) {
+    if (!process.env.JWT_REFRESH_SECRET) {
+      throw new Error('JWT_REFRESH_SECRET is not defined');
+    }
+
+    let payload: { sub: string };
+
+    try {
+      payload = await this.jwtService.verifyAsync<{
+        sub: string;
+      }>(token, {
+        secret: process.env.JWT_REFRESH_SECRET,
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const userId = payload.sub;
+
+    // Find all active sessions belonging to this user.
+    const sessions = await this.databaseService.db
+      .select()
+      .from(refreshTokens)
+      .where(eq(refreshTokens.userId, userId));
+
+    let matchedSession: (typeof sessions)[number] | undefined;
+
+    // Find the session belonging to this refresh token.
+    for (const session of sessions) {
+      const matches = await bcrypt.compare(token, session.tokenHash);
+
+      if (matches) {
+        matchedSession = session;
+        break;
+      }
+    }
+
+    if (!matchedSession) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    // Revoke this session.
+    await this.databaseService.db
+      .delete(refreshTokens)
+      .where(eq(refreshTokens.id, matchedSession.id));
+
+    return {
+      message: 'Logged out successfully',
+    };
+  }
 }
