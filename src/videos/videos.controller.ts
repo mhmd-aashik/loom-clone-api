@@ -73,4 +73,16 @@ export class VideosController {
   ) {
     return this.videosService.getVideo(user.userId, videoId);
   }
+
+  @Get(':videoId/playback-url')
+  @UseGuards(JwtAuthGuard)
+  getPlaybackUrl(
+    @CurrentUser()
+    user: AuthenticatedUser,
+
+    @Param('videoId')
+    videoId: string,
+  ) {
+    return this.videosService.getPlaybackUrl(user.userId, videoId);
+  }
 }

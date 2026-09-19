@@ -193,4 +193,33 @@ export class VideosService {
 
     return video;
   }
+
+  async getPlaybackUrl(userId: string, videoId: string) {
+    const [video] = await this.databaseService.db
+      .select({
+        id: videos.id,
+        status: videos.status,
+        processedStorageKey: videos.processedStorageKey,
+      })
+      .from(videos)
+      .where(and(eq(videos.id, videoId), eq(videos.ownerId, userId)))
+      .limit(1);
+
+    if (!video) {
+      throw new NotFoundException('Video not found');
+    }
+
+    if (video.status !== 'READY' || !video.processedStorageKey) {
+      throw new BadRequestException('Video is not ready for playback');
+    }
+
+    const playbackUrl = await this.storageService.createDownloadUrl(
+      video.processedStorageKey,
+    );
+
+    return {
+      playbackUrl,
+      expiresIn: 900,
+    };
+  }
 }

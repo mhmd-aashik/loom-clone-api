@@ -106,4 +106,15 @@ export class StorageService {
 
     await this.s3Client.send(command);
   }
+
+  async createDownloadUrl(storageKey: string): Promise<string> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: storageKey,
+    });
+
+    return getSignedUrl(this.s3Client, command, {
+      expiresIn: 60 * 15, // 15 minutes
+    });
+  }
 }
