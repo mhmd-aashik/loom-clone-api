@@ -15,6 +15,13 @@
       "when": 1789826877208,
       "tag": "0001_parallel_nico_minoru",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789828828177,
+      "tag": "0002_pretty_miek",
+      "breakpoints": true
     }
   ]
 }
