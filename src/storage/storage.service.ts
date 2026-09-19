@@ -91,4 +91,19 @@ export class StorageService {
 
     return response.Body.transformToByteArray();
   }
+
+  async uploadObject(
+    storageKey: string,
+    body: Uint8Array,
+    contentType: string,
+  ): Promise<void> {
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: storageKey,
+      Body: body,
+      ContentType: contentType,
+    });
+
+    await this.s3Client.send(command);
+  }
 }
