@@ -5,6 +5,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 
+import { createHash, randomUUID } from 'crypto';
+
 import * as bcrypt from 'bcrypt';
 import { and, eq, gt } from 'drizzle-orm';
 
@@ -79,7 +81,7 @@ export class AuthService {
 
     const { accessToken, refreshToken } = await this.generateTokens(user.id);
 
-    const refreshTokenHash = await bcrypt.hash(refreshToken, 12);
+    const refreshTokenHash = await this.hashRefreshToken(refreshToken);
 
     const expiresAt = new Date();
 
@@ -140,9 +142,11 @@ export class AuthService {
     );
 
     // Long-lived token used only to obtain new access tokens.
+    // `jti` makes two tokens issued in the same second unique.
     const refreshToken = await this.jwtService.signAsync(
       {
         sub: userId,
+        jti: randomUUID(),
       },
       {
         secret: process.env.JWT_REFRESH_SECRET,
@@ -191,7 +195,7 @@ export class AuthService {
     let matchedSession: (typeof sessions)[number] | undefined;
 
     for (const session of sessions) {
-      const matches = await bcrypt.compare(token, session.tokenHash);
+      const matches = await this.compareRefreshToken(token, session.tokenHash);
 
       if (matches) {
         matchedSession = session;
@@ -212,7 +216,7 @@ export class AuthService {
     // Generate a fresh access + refresh token.
     const { accessToken, refreshToken } = await this.generateTokens(userId);
 
-    const refreshTokenHash = await bcrypt.hash(refreshToken, 12);
+    const refreshTokenHash = await this.hashRefreshToken(refreshToken);
 
     const expiresAt = new Date();
 
@@ -229,5 +233,18 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  // bcrypt only hashes the first 72 bytes, so digest the JWT first.
+  private digestRefreshToken(token: string) {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  private hashRefreshToken(token: string) {
+    return bcrypt.hash(this.digestRefreshToken(token), 12);
+  }
+
+  private compareRefreshToken(token: string, tokenHash: string) {
+    return bcrypt.compare(this.digestRefreshToken(token), tokenHash);
   }
 }
