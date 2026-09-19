@@ -109,6 +109,33 @@ export class VideoProcessor extends WorkerHost {
       console.log(`Video converted: ${videoId}`);
 
       // ----------------------------------------
+      // Extract video duration using ffprobe
+      // ----------------------------------------
+
+      const { stdout } = await execFileAsync('ffprobe', [
+        '-v',
+        'error',
+
+        '-show_entries',
+        'format=duration',
+
+        '-of',
+        'default=noprint_wrappers=1:nokey=1',
+
+        outputPath,
+      ]);
+
+      const duration = Number.parseFloat(stdout.trim());
+
+      if (!Number.isFinite(duration)) {
+        throw new Error(`Unable to determine video duration: ${videoId}`);
+      }
+
+      const durationSeconds = Math.ceil(duration);
+
+      console.log(`Video duration: ${durationSeconds} seconds`);
+
+      // ----------------------------------------
       // 5. Generate thumbnail
       // ----------------------------------------
 
@@ -184,6 +211,7 @@ export class VideoProcessor extends WorkerHost {
         .set({
           processedStorageKey,
           thumbnailStorageKey,
+          durationSeconds,
           status: 'READY',
           updatedAt: new Date(),
         })
