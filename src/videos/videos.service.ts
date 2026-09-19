@@ -9,6 +9,11 @@ import { videos } from '../database/schemas';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { StorageService } from '../storage/storage.service';
 import { eq } from 'drizzle-orm';
+import {
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 
 @Injectable()
 export class VideosService {
@@ -96,10 +101,28 @@ export class VideosService {
       throw new BadRequestException('Video upload has not been initialized');
     }
 
+    // Ask Railway Storage whether the object
+    // actually exists.
+    let metadata: {
+      sizeBytes?: number;
+      contentType?: string;
+    };
+
+    try {
+      metadata = await this.storageService.getObjectMetadata(video.storageKey);
+    } catch {
+      throw new BadRequestException('Uploaded video was not found in storage');
+    }
+
     const [updatedVideo] = await this.databaseService.db
       .update(videos)
       .set({
         status: 'PROCESSING',
+
+        sizeBytes: metadata.sizeBytes ?? null,
+
+        mimeType: metadata.contentType ?? video.mimeType,
+
         updatedAt: new Date(),
       })
       .where(eq(videos.id, videoId))
