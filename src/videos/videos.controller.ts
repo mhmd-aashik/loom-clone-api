@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -13,6 +14,7 @@ import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { VideosService } from './videos.service';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
+import { UpdateVideoDto } from './dto/update-video.dto';
 
 @Controller('videos')
 export class VideosController {
@@ -104,5 +106,20 @@ export class VideosController {
     videoId: string,
   ) {
     return this.videosService.deleteVideo(user.userId, videoId);
+  }
+
+  @Patch(':videoId')
+  @UseGuards(JwtAuthGuard)
+  updateVideo(
+    @CurrentUser()
+    user: AuthenticatedUser,
+
+    @Param('videoId')
+    videoId: string,
+
+    @Body()
+    dto: UpdateVideoDto,
+  ) {
+    return this.videosService.updateVideo(user.userId, videoId, dto);
   }
 }

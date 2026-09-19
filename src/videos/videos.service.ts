@@ -11,6 +11,7 @@ import { StorageService } from '../storage/storage.service';
 import { eq, desc, and } from 'drizzle-orm';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
+import { UpdateVideoDto } from './dto/update-video.dto';
 
 @Injectable()
 export class VideosService {
@@ -252,5 +253,45 @@ export class VideosService {
     return {
       message: 'Video deleted successfully',
     };
+  }
+
+  async updateVideo(userId: string, videoId: string, dto: UpdateVideoDto) {
+    // Ownership check.
+    const [video] = await this.databaseService.db
+      .select({
+        id: videos.id,
+      })
+      .from(videos)
+      .where(and(eq(videos.id, videoId), eq(videos.ownerId, userId)))
+      .limit(1);
+
+    if (!video) {
+      throw new NotFoundException('Video not found');
+    }
+
+    const [updatedVideo] = await this.databaseService.db
+      .update(videos)
+      .set({
+        ...(dto.title !== undefined && {
+          title: dto.title.trim(),
+        }),
+
+        ...(dto.visibility !== undefined && {
+          visibility: dto.visibility,
+        }),
+
+        updatedAt: new Date(),
+      })
+      .where(and(eq(videos.id, videoId), eq(videos.ownerId, userId)))
+      .returning({
+        id: videos.id,
+        title: videos.title,
+        status: videos.status,
+        visibility: videos.visibility,
+        createdAt: videos.createdAt,
+        updatedAt: videos.updatedAt,
+      });
+
+    return updatedVideo;
   }
 }
