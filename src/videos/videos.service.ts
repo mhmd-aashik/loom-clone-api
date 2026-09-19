@@ -8,7 +8,7 @@ import { DatabaseService } from '../database/database.service';
 import { videos } from '../database/schemas';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { StorageService } from '../storage/storage.service';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
 
@@ -168,5 +168,29 @@ export class VideosService {
       .from(videos)
       .where(eq(videos.ownerId, userId))
       .orderBy(desc(videos.createdAt));
+  }
+
+  async getVideo(userId: string, videoId: string) {
+    const [video] = await this.databaseService.db
+      .select({
+        id: videos.id,
+        title: videos.title,
+        status: videos.status,
+        visibility: videos.visibility,
+        durationSeconds: videos.durationSeconds,
+        sizeBytes: videos.sizeBytes,
+        mimeType: videos.mimeType,
+        createdAt: videos.createdAt,
+        updatedAt: videos.updatedAt,
+      })
+      .from(videos)
+      .where(and(eq(videos.id, videoId), eq(videos.ownerId, userId)))
+      .limit(1);
+
+    if (!video) {
+      throw new NotFoundException('Video not found');
+    }
+
+    return video;
   }
 }
