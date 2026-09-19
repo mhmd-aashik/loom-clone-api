@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
@@ -84,5 +92,17 @@ export class VideosController {
     videoId: string,
   ) {
     return this.videosService.getPlaybackUrl(user.userId, videoId);
+  }
+
+  @Delete(':videoId')
+  @UseGuards(JwtAuthGuard)
+  deleteVideo(
+    @CurrentUser()
+    user: AuthenticatedUser,
+
+    @Param('videoId')
+    videoId: string,
+  ) {
+    return this.videosService.deleteVideo(user.userId, videoId);
   }
 }

@@ -5,6 +5,7 @@ import {
   PutObjectCommand,
   S3Client,
   GetObjectCommand,
+  DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 
 @Injectable()
@@ -116,5 +117,14 @@ export class StorageService {
     return getSignedUrl(this.s3Client, command, {
       expiresIn: 60 * 15, // 15 minutes
     });
+  }
+
+  async deleteObject(storageKey: string): Promise<void> {
+    const command = new DeleteObjectCommand({
+      Bucket: this.bucketName,
+      Key: storageKey,
+    });
+
+    await this.s3Client.send(command);
   }
 }

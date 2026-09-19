@@ -222,4 +222,35 @@ export class VideosService {
       expiresIn: 900,
     };
   }
+
+  async deleteVideo(userId: string, videoId: string) {
+    const [video] = await this.databaseService.db
+      .select()
+      .from(videos)
+      .where(and(eq(videos.id, videoId), eq(videos.ownerId, userId)))
+      .limit(1);
+
+    if (!video) {
+      throw new NotFoundException('Video not found');
+    }
+
+    // Delete original file.
+    if (video.storageKey) {
+      await this.storageService.deleteObject(video.storageKey);
+    }
+
+    // Delete processed file.
+    if (video.processedStorageKey) {
+      await this.storageService.deleteObject(video.processedStorageKey);
+    }
+
+    // Finally remove metadata.
+    await this.databaseService.db
+      .delete(videos)
+      .where(and(eq(videos.id, videoId), eq(videos.ownerId, userId)));
+
+    return {
+      message: 'Video deleted successfully',
+    };
+  }
 }
