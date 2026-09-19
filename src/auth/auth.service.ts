@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 
 import * as bcrypt from 'bcrypt';
-import { eq } from 'drizzle-orm';
+import { and, eq, gt } from 'drizzle-orm';
 
 import { DatabaseService } from '../database/database.service';
 import { refreshTokens, users } from '../database/schemas';
@@ -149,6 +149,81 @@ export class AuthService {
         expiresIn: '7d',
       },
     );
+
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  async refresh(token: string) {
+    if (!process.env.JWT_REFRESH_SECRET) {
+      throw new Error('JWT_REFRESH_SECRET is not defined');
+    }
+
+    let payload: { sub: string };
+
+    // First verify that this is a valid refresh JWT.
+    try {
+      payload = await this.jwtService.verifyAsync<{
+        sub: string;
+      }>(token, {
+        secret: process.env.JWT_REFRESH_SECRET,
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const userId = payload.sub;
+
+    // Get this user's active refresh-token sessions.
+    const sessions = await this.databaseService.db
+      .select()
+      .from(refreshTokens)
+      .where(
+        and(
+          eq(refreshTokens.userId, userId),
+          gt(refreshTokens.expiresAt, new Date()),
+        ),
+      );
+
+    // Find which stored hash belongs to this token.
+    let matchedSession: (typeof sessions)[number] | undefined;
+
+    for (const session of sessions) {
+      const matches = await bcrypt.compare(token, session.tokenHash);
+
+      if (matches) {
+        matchedSession = session;
+        break;
+      }
+    }
+
+    if (!matchedSession) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    // Rotation:
+    // the old refresh token can no longer be used.
+    await this.databaseService.db
+      .delete(refreshTokens)
+      .where(eq(refreshTokens.id, matchedSession.id));
+
+    // Generate a fresh access + refresh token.
+    const { accessToken, refreshToken } = await this.generateTokens(userId);
+
+    const refreshTokenHash = await bcrypt.hash(refreshToken, 12);
+
+    const expiresAt = new Date();
+
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    // Store only the new refresh-token hash.
+    await this.databaseService.db.insert(refreshTokens).values({
+      userId,
+      tokenHash: refreshTokenHash,
+      expiresAt,
+    });
 
     return {
       accessToken,
