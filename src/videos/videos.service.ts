@@ -155,7 +155,7 @@ export class VideosService {
   }
 
   async getMyVideos(userId: string) {
-    return this.databaseService.db
+    const userVideos = await this.databaseService.db
       .select({
         id: videos.id,
         title: videos.title,
@@ -164,12 +164,38 @@ export class VideosService {
         durationSeconds: videos.durationSeconds,
         sizeBytes: videos.sizeBytes,
         mimeType: videos.mimeType,
+
+        // Internal use only.
+        thumbnailStorageKey: videos.thumbnailStorageKey,
+
         createdAt: videos.createdAt,
         updatedAt: videos.updatedAt,
       })
       .from(videos)
       .where(eq(videos.ownerId, userId))
       .orderBy(desc(videos.createdAt));
+
+    const result = await Promise.all(
+      userVideos.map(async (video) => {
+        let thumbnailUrl: string | null = null;
+
+        if (video.thumbnailStorageKey) {
+          thumbnailUrl = await this.storageService.createDownloadUrl(
+            video.thumbnailStorageKey,
+          );
+        }
+
+        // Do NOT expose storage key.
+        const { thumbnailStorageKey, ...videoData } = video;
+
+        return {
+          ...videoData,
+          thumbnailUrl,
+        };
+      }),
+    );
+
+    return result;
   }
 
   async getVideo(userId: string, videoId: string) {
