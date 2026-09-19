@@ -372,4 +372,67 @@ export class VideosService {
       sharePath: `/share/${share.token}`,
     };
   }
+
+  async getSharedVideo(token: string) {
+    const [result] = await this.databaseService.db
+      .select({
+        id: videos.id,
+        title: videos.title,
+        status: videos.status,
+        durationSeconds: videos.durationSeconds,
+        createdAt: videos.createdAt,
+        processedStorageKey: videos.processedStorageKey,
+      })
+      .from(videoShares)
+      .innerJoin(videos, eq(videoShares.videoId, videos.id))
+      .where(and(eq(videoShares.token, token), eq(videos.status, 'READY')))
+      .limit(1);
+
+    if (!result || !result.processedStorageKey) {
+      throw new NotFoundException('Shared video not found');
+    }
+
+    const playbackUrl = await this.storageService.createDownloadUrl(
+      result.processedStorageKey,
+    );
+
+    return {
+      id: result.id,
+      title: result.title,
+      durationSeconds: result.durationSeconds,
+      createdAt: result.createdAt,
+      playbackUrl,
+      playbackUrlExpiresIn: 900,
+    };
+  }
+
+  async revokeShareLink(userId: string, videoId: string, token: string) {
+    // Find the share and make sure it belongs
+    // to this user and this video.
+    const [share] = await this.databaseService.db
+      .select({
+        id: videoShares.id,
+      })
+      .from(videoShares)
+      .where(
+        and(
+          eq(videoShares.videoId, videoId),
+          eq(videoShares.ownerId, userId),
+          eq(videoShares.token, token),
+        ),
+      )
+      .limit(1);
+
+    if (!share) {
+      throw new NotFoundException('Share link not found');
+    }
+
+    await this.databaseService.db
+      .delete(videoShares)
+      .where(eq(videoShares.id, share.id));
+
+    return {
+      message: 'Share link revoked successfully',
+    };
+  }
 }

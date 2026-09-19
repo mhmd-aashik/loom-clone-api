@@ -142,4 +142,19 @@ export class VideosController {
   ) {
     return this.videosService.createShareLink(user.userId, videoId);
   }
+
+  @Delete(':videoId/share/:token')
+  @UseGuards(JwtAuthGuard)
+  revokeShareLink(
+    @CurrentUser()
+    user: AuthenticatedUser,
+
+    @Param('videoId')
+    videoId: string,
+
+    @Param('token')
+    token: string,
+  ) {
+    return this.videosService.revokeShareLink(user.userId, videoId, token);
+  }
 }

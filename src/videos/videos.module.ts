@@ -10,5 +10,6 @@ import { VideoProcessor } from './processors/video.processor';
   imports: [AuthModule, StorageModule, QueueModule],
   controllers: [VideosController],
   providers: [VideosService, VideoProcessor],
+  exports: [VideosService],
 })
 export class VideosModule {}
