@@ -8,6 +8,13 @@
       "when": 1789816232741,
       "tag": "0000_panoramic_falcon",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789826877208,
+      "tag": "0001_parallel_nico_minoru",
+      "breakpoints": true
     }
   ]
 }
