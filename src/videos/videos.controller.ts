@@ -67,7 +67,7 @@ export class VideosController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  getMyVideos(  
+  getMyVideos(
     @CurrentUser()
     user: AuthenticatedUser,
 
@@ -78,6 +78,7 @@ export class VideosController {
       user.userId,
       query.limit,
       query.cursor,
+      query.search,
     );
   }
 

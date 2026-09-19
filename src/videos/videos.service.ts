@@ -8,7 +8,7 @@ import { DatabaseService } from '../database/database.service';
 import { videos, videoShares } from '../database/schemas';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { StorageService } from '../storage/storage.service';
-import { eq, desc, and, lt, or } from 'drizzle-orm';
+import { eq, desc, and, lt, or, ilike } from 'drizzle-orm';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
 import { UpdateVideoDto } from './dto/update-video.dto';
@@ -154,7 +154,12 @@ export class VideosService {
     return updatedVideo;
   }
 
-  async getMyVideos(userId: string, limit = 12, cursor?: string) {
+  async getMyVideos(
+    userId: string,
+    limit = 12,
+    cursor?: string,
+    search?: string,
+  ) {
     let cursorDate: Date | undefined;
     let cursorId: string | undefined;
 
@@ -180,6 +185,12 @@ export class VideosService {
     }
 
     const conditions = [eq(videos.ownerId, userId)];
+
+    const searchTerm = search?.trim();
+
+    if (searchTerm) {
+      conditions.push(ilike(videos.title, `%${searchTerm}%`));
+    }
 
     if (cursorDate && cursorId) {
       conditions.push(

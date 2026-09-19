@@ -12,4 +12,8 @@ export class VideoQueryDto {
   @IsOptional()
   @IsString()
   cursor?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 }
