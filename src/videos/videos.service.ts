@@ -8,7 +8,7 @@ import { DatabaseService } from '../database/database.service';
 import { videos, videoShares } from '../database/schemas';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { StorageService } from '../storage/storage.service';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, lt, or } from 'drizzle-orm';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
 import { UpdateVideoDto } from './dto/update-video.dto';
@@ -154,7 +154,45 @@ export class VideosService {
     return updatedVideo;
   }
 
-  async getMyVideos(userId: string) {
+  async getMyVideos(userId: string, limit = 12, cursor?: string) {
+    let cursorDate: Date | undefined;
+    let cursorId: string | undefined;
+
+    if (cursor) {
+      try {
+        const decoded = JSON.parse(
+          Buffer.from(cursor, 'base64url').toString('utf8'),
+        ) as {
+          createdAt: string;
+          id: string;
+        };
+
+        cursorDate = new Date(decoded.createdAt);
+
+        cursorId = decoded.id;
+
+        if (Number.isNaN(cursorDate.getTime()) || !cursorId) {
+          throw new Error();
+        }
+      } catch {
+        throw new BadRequestException('Invalid cursor');
+      }
+    }
+
+    const conditions = [eq(videos.ownerId, userId)];
+
+    if (cursorDate && cursorId) {
+      conditions.push(
+        or(
+          lt(videos.createdAt, cursorDate),
+
+          and(eq(videos.createdAt, cursorDate), lt(videos.id, cursorId)),
+        )!,
+      );
+    }
+
+    // Fetch one extra record so we know
+    // whether another page exists.
     const userVideos = await this.databaseService.db
       .select({
         id: videos.id,
@@ -164,28 +202,27 @@ export class VideosService {
         durationSeconds: videos.durationSeconds,
         sizeBytes: videos.sizeBytes,
         mimeType: videos.mimeType,
-
-        // Internal use only.
         thumbnailStorageKey: videos.thumbnailStorageKey,
-
         createdAt: videos.createdAt,
         updatedAt: videos.updatedAt,
       })
       .from(videos)
-      .where(eq(videos.ownerId, userId))
-      .orderBy(desc(videos.createdAt));
+      .where(and(...conditions))
+      .orderBy(desc(videos.createdAt), desc(videos.id))
+      .limit(limit + 1);
 
-    const result = await Promise.all(
-      userVideos.map(async (video) => {
-        let thumbnailUrl: string | null = null;
+    const hasMore = userVideos.length > limit;
 
-        if (video.thumbnailStorageKey) {
-          thumbnailUrl = await this.storageService.createDownloadUrl(
-            video.thumbnailStorageKey,
-          );
-        }
+    const page = hasMore ? userVideos.slice(0, limit) : userVideos;
 
-        // Do NOT expose storage key.
+    const items = await Promise.all(
+      page.map(async (video) => {
+        const thumbnailUrl = video.thumbnailStorageKey
+          ? await this.storageService.createDownloadUrl(
+              video.thumbnailStorageKey,
+            )
+          : null;
+
         const { thumbnailStorageKey, ...videoData } = video;
 
         return {
@@ -195,7 +232,24 @@ export class VideosService {
       }),
     );
 
-    return result;
+    let nextCursor: string | null = null;
+
+    if (hasMore && page.length > 0) {
+      const lastVideo = page[page.length - 1];
+
+      nextCursor = Buffer.from(
+        JSON.stringify({
+          createdAt: lastVideo.createdAt.toISOString(),
+          id: lastVideo.id,
+        }),
+      ).toString('base64url');
+    }
+
+    return {
+      items,
+      nextCursor,
+      hasMore,
+    };
   }
 
   async getVideo(userId: string, videoId: string) {

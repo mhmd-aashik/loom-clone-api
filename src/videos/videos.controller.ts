@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -15,6 +16,7 @@ import { CreateVideoDto } from './dto/create-video.dto';
 import { VideosService } from './videos.service';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 import { UpdateVideoDto } from './dto/update-video.dto';
+import { VideoQueryDto } from './dto/video-query.dto';
 
 @Controller('videos')
 export class VideosController {
@@ -65,11 +67,18 @@ export class VideosController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  getMyVideos(
+  getMyVideos(  
     @CurrentUser()
     user: AuthenticatedUser,
+
+    @Query()
+    query: VideoQueryDto,
   ) {
-    return this.videosService.getMyVideos(user.userId);
+    return this.videosService.getMyVideos(
+      user.userId,
+      query.limit,
+      query.cursor,
+    );
   }
 
   @Get(':videoId')
