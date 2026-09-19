@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
@@ -51,5 +51,14 @@ export class VideosController {
     videoId: string,
   ) {
     return this.videosService.completeUpload(user.userId, videoId);
+  }
+
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  getMyVideos(
+    @CurrentUser()
+    user: AuthenticatedUser,
+  ) {
+    return this.videosService.getMyVideos(user.userId);
   }
 }

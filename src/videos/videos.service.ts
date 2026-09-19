@@ -8,7 +8,7 @@ import { DatabaseService } from '../database/database.service';
 import { videos } from '../database/schemas';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { StorageService } from '../storage/storage.service';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { Queue } from 'bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
 
@@ -150,5 +150,23 @@ export class VideosService {
     );
 
     return updatedVideo;
+  }
+
+  async getMyVideos(userId: string) {
+    return this.databaseService.db
+      .select({
+        id: videos.id,
+        title: videos.title,
+        status: videos.status,
+        visibility: videos.visibility,
+        durationSeconds: videos.durationSeconds,
+        sizeBytes: videos.sizeBytes,
+        mimeType: videos.mimeType,
+        createdAt: videos.createdAt,
+        updatedAt: videos.updatedAt,
+      })
+      .from(videos)
+      .where(eq(videos.ownerId, userId))
+      .orderBy(desc(videos.createdAt));
   }
 }
