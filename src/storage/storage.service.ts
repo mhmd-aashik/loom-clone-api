@@ -4,6 +4,7 @@ import {
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
+  GetObjectCommand,
 } from '@aws-sdk/client-s3';
 
 @Injectable()
@@ -74,5 +75,20 @@ export class StorageService {
       sizeBytes: response.ContentLength,
       contentType: response.ContentType,
     };
+  }
+
+  async downloadObject(storageKey: string): Promise<Uint8Array> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: storageKey,
+    });
+
+    const response = await this.s3Client.send(command);
+
+    if (!response.Body) {
+      throw new Error('Storage object has no body');
+    }
+
+    return response.Body.transformToByteArray();
   }
 }
