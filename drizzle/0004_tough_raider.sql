@@ -1,0 +1,1 @@
+ALTER TABLE "videos" ADD COLUMN "thumbnail_storage_key" varchar(1000);

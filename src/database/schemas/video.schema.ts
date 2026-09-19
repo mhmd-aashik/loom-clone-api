@@ -64,6 +64,10 @@ export const videos = pgTable('videos', {
     length: 100,
   }),
 
+  thumbnailStorageKey: varchar('thumbnail_storage_key', {
+    length: 1000,
+  }),
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
 
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
